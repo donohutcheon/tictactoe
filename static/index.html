@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" href="styles.css">
+    </head>
+    <body>
+        <div class="grid-container">
+            <div class="header">
+                <h1>
+                    Tic Tac Toe
+                </h1>
+            </div>
+            <div class="left">
+                <p id="instructions">Next Player: X</p>
+                <button class="btn" type="button" onclick="onResetGame()">Reset</button>
+            </div>
+            <div class="main">
+                <canvas id="myCanvas" onresize="resize()">
+                    Your browser does not support the HTML5 canvas tag.</canvas>
+            </div>
+        </div>
+        <script src="./node_modules/axios/dist/axios.min.js"></script>
+        <script src="index.js"></script>
+    </body>
+</html>
