@@ -190,18 +190,27 @@ func (g *Game) GetGameResult() (Result, [][]SquareState) {
 
 func SetGameState(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	b, err := ioutil.ReadAll(r.Body)
-	writeHTTPError(w, http.StatusBadRequest, "could read request", err)
+	if err != nil {
+		writeHTTPError(w, http.StatusBadRequest, "could read request", err)
+		return
+	}
 
 	req := &TicTacToeStateRequest{
 		Board: MakeBoard(3),
 	}
 	err = json.Unmarshal(b, req)
-	writeHTTPError(w, http.StatusBadRequest, "could not interpret request", err)
+	if err != nil {
+		writeHTTPError(w, http.StatusBadRequest, "could not interpret request", err)
+		return
+	}
 
 	g := NewGameFromRequest(req)
 	_, x, y := ComputeMove(*g, true)
 	err = g.SetBoard(x, y)
-	writeHTTPError(w, http.StatusInternalServerError, "failed to set board", err)
+	if err != nil {
+		writeHTTPError(w, http.StatusInternalServerError, "failed to set board", err)
+		return
+	}
 
 	result, winningRow := g.GetGameResult()
 	resp := TicTacToeStateResponse{
@@ -213,9 +222,16 @@ func SetGameState(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 	}
 
 	b, err = json.Marshal(resp)
-	writeHTTPError(w, http.StatusInternalServerError, "failed to marshal response", err)
+	if err != nil {
+		writeHTTPError(w, http.StatusInternalServerError, "failed to marshal response", err)
+		return
+	}
 
-	w.Write(b)
+	_, err = w.Write(b)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 }
 
 func writeHTTPError(w http.ResponseWriter, statusCode int, description string, err error) {
