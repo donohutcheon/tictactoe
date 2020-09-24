@@ -1,0 +1,7 @@
+.idea/
+bin/
+.docker_build/
+.env
+
+#sensitive commands
+commands.md
