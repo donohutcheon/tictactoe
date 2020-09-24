@@ -1,5 +1,7 @@
 package game
 
+import "log"
+
 func ComputeMove(gameState Game, isMax bool) (int, int, int) {
 	optimalX := 0
 	optimalY := 0
@@ -21,15 +23,17 @@ func ComputeMove(gameState Game, isMax bool) (int, int, int) {
 			}
 
 			player := gameState.playersTurn()
-			gs.SetBoard(x, y)
+			err := gs.SetBoard(x, y)
+			if err != nil {
+				log.Fatal(err)
+				continue
+			}
 			result, _ := gs.GetGameResult()
 			if result == ResultNInARow {
 				return 1 * multiplier, x, y
 			} else if result == ResultStalemate {
 				return 0, x, y
 			}
-
-			player = opponent(player)
 
 			r, _, _ := ComputeMove(gs, !isMax)
 

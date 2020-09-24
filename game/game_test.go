@@ -47,9 +47,6 @@ func TestGame_String(t *testing.T) {
 }
 
 func TestGame_SetBoard(t *testing.T) {
-	type fields struct {
-		Board [3][3]SquareState
-	}
 	type args struct {
 		x      int
 		y      int

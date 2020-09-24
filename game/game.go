@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strings"
 
@@ -39,10 +40,6 @@ type TicTacToeStateResponse struct {
 	WinningRow [][]SquareState   `json:"winningRow,omitempty"`
 	Turn       int               `json:"turn"`
 	NextPlayer rune              `json:"nextPlayer"`
-}
-
-type ErrorResponse struct {
-	error string
 }
 
 func MakeBoard(n int) [][]SquareState {
@@ -193,7 +190,11 @@ func (g *Game) GetGameResult() (Result, [][]SquareState) {
 func SetGameState(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		w.Write([]byte("Oh dear, something messed up"))
+		_, wErr := w.Write([]byte("Oh dear, something messed up"))
+		if wErr != nil {
+			log.Fatal(wErr)
+		}
+		log.Fatal(err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
@@ -202,7 +203,10 @@ func SetGameState(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 	}
 	err = json.Unmarshal(b, req)
 	if err != nil {
-		w.Write([]byte("could not interpret request"))
+		_, wErr := w.Write([]byte("could not interpret request"))
+		if wErr != nil {
+			log.Fatal(wErr)
+		}
 		w.WriteHeader(http.StatusBadRequest)
 	}
 
@@ -221,7 +225,10 @@ func SetGameState(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 
 	b, err = json.Marshal(resp)
 	if err != nil {
-		w.Write([]byte("Oh dear, something messed up"))
+		_, wErr := w.Write([]byte("Oh dear, something messed up"))
+		if wErr != nil {
+			log.Fatal(wErr)
+		}
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
