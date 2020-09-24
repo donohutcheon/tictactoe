@@ -205,11 +205,14 @@ func SetGameState(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 	}
 
 	g := NewGameFromRequest(req)
-	_, x, y := ComputeMove(*g, true)
-	err = g.SetBoard(x, y)
-	if err != nil {
-		writeHTTPError(w, http.StatusInternalServerError, "failed to set board", err)
-		return
+	result, _ := g.GetGameResult()
+	if result == ResultNone {
+		_, x, y := ComputeMove(*g, true)
+		err = g.SetBoard(x, y)
+		if err != nil {
+			writeHTTPError(w, http.StatusInternalServerError, "failed to set board", err)
+			return
+		}
 	}
 
 	result, winningRow := g.GetGameResult()
