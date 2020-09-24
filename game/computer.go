@@ -22,7 +22,6 @@ func ComputeMove(gameState Game, isMax bool) (int, int, int) {
 				Turn:  gameState.Turn,
 			}
 
-			player := gameState.playersTurn()
 			err := gs.SetBoard(x, y)
 			if err != nil {
 				log.Fatal(err)
