@@ -26,9 +26,11 @@ func main() {
 	router.NotFound =  static
 
 	//ServiceAddress address to listen on
-	bindAddress := os.Getenv("BIND_ADDRESS")
 	port        := os.Getenv("PORT")
-	serviceAddress := fmt.Sprintf("%s:%s", bindAddress, port)
+	if len(port) == 0 {
+		port = "8080"
+	}
+	serviceAddress := fmt.Sprintf(":%s", port)
 	srv := &http.Server{
 		Addr:              serviceAddress,
 		Handler:           router,
