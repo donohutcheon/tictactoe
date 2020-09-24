@@ -14,7 +14,7 @@ import (
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		panic(err)
+		log.Printf("failed to load env file : %s", err)
 	}
 
 	router := httprouter.New()
