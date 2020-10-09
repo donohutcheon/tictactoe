@@ -44,7 +44,7 @@ backend game logic that:
 1. Testing. There are many benefits to writing tests. Apart from preventing embarrassing bugs from making it to 
 production, for me writing tests streamlines the development process and makes it more enjoyable to code.  Tests in Go 
 are first class citizens of your source, and the language provides a neat framework to run tests. Some noteworthy 
-features are code coverage reporting, race condition detection and benchmark testing and profiling. Beyond writing basic
+features are code coverage reporting, race condition detection, benchmark testing and profiling. Beyond writing basic
 unit and integration tests, we won't cover these topics in this tutorial.  This should give you an awareness of what 
 features are available.
 
@@ -91,12 +91,12 @@ PORT=8080
 Lastly create a directory called `static` inside our project directory to house all our static HTML, CSS, favicon and 
 Javascript.  We will add content to this directory later, for now just leave it empty.
 
-## Adding code
+## Adding the main function
 
 Every Go program has a main file, a main package and a main function.  Create a `main.go` file inside your project 
 directory as follows:
 
-```{.go attr.source='.numberLines'}
+```go
 package main
 
 import (
@@ -110,18 +110,23 @@ import (
 )
 
 func main() {
-	err := godotenv.Load()
+    // Paragraph #1
+    err := godotenv.Load()
 	if err != nil {
-		log.Printf("failed to load env file : %s", err)
+		log.Printf("not using .env file")
 	}
-
+	
+    // Paragraph #2
 	router := httprouter.New()
 	router.NotFound = http.FileServer(http.Dir("static"))
 
+    // Paragraph #3
 	port := os.Getenv("PORT")
 	if len(port) == 0 {
 		port = "8080"
 	}
+
+    // Paragraph #4
 	serviceAddress := fmt.Sprintf(":%s", port)
 	srv := &http.Server{
 		Addr:              serviceAddress,
@@ -131,3 +136,32 @@ func main() {
 }
 ```
 
+The breakdown is as follows:
+### Paragraph #1 Loading development ENV values
+As mentioned above, we use github.com/joho/godotenv to load environment variables specific to your development 
+environment from the `.env` file located in your project directory.  The `.env` file should not be committed to git or at
+least omitted from the Docker image that gets built for production. Thus `godotenv.Load()` will actually return an 
+error in production, which can just be ignored.
+
+### Paragraph #2 Creating the MUX router   
+We create a MUX router (aka HTTP multiplexer) using the `github.com/julienschmidt/httprouter` library.  This package 
+maps routes to HTTP handler functions. We're specifically using this third-party library over and above Go's 
+standard MUX router to allow us to serve the HTML, CSS, favicon and JavaScript from the static directory.  Gorilla Mux
+is another popular option among the Go community. For this project I opted to expose myself to this router library as
+[benchmark tests have proven it to be  fast and efficient with memory allocations](https://github.com/julienschmidt/go-http-routing-benchmark). 
+
+### Paragraph #3 Read PORT environment variable
+In paragraph #3 we call on the `os` package to read the value of `PORT` environment variable.  If no such value exists
+then we default to port 8080. Cloud services such as Google Cloud Run, Heroku, etc. usually stipulate which port the 
+service needs to listen on via environment variables. In development, we obtain this value from the `.env` file.
+
+### Paragraph #4 Listen and Serve
+Paragraph #4 creates and configures a pointer to a `http.Server` such that the server binds to all interfaces on the 
+specified port. `http.ListenAndServe` is a blocking call which returns upon error or upon process termination. 
+
+## Adding the game logic
+
+In this section we are going to:
+1. Create a new package called game and add a new file called game.go.
+1. Write the logic that will govern the game.
+1. Write tests to prove the logic. 
