@@ -19,11 +19,7 @@ func main() {
 
 	router := httprouter.New()
 	router.PUT("/game-state", game.TicTacToeStateHandler)
-	router.Handler(http.MethodGet, "/debug/pprof/*item", http.DefaultServeMux)
-
-	static := httprouter.New()
-	static.ServeFiles ("/*filepath", http.Dir("static"))
-	router.NotFound =  static
+	router.NotFound = http.FileServer(http.Dir("static"))
 
 	port        := os.Getenv("PORT")
 	if len(port) == 0 {

@@ -37,10 +37,39 @@ backend.
 backend game logic that:
     - Validates the incoming request from the browser.
     - Calculates the most optimal move for the computer to make.
-    - Determines whether the game has been concluded and calculates the result.  
+    - Determines whether the game has been concluded and calculates the result.
+1. Testing. There are many benefits to writing tests. Apart from preventing embarrassing bugs from making it to 
+production, for me writing tests streamlines the development process and makes it more enjoyable to code.  Tests in Go 
+are first class citizens of your source, and the language provides a neat framework to run tests. Some noteworthy 
+features are code coverage reporting, race condition detection and benchmark testing and profiling. Beyond writing basic
+unit and integration tests, we won't cover these topics in this tutorial.  This should give you an awareness of what 
+features are available.
 
 It's worth noting that the entire game could be implemented in the browser using plain JavaScript since (in this case) 
 the backend isn't making any third-party API calls, accessing databases or interacting with other microservices i.e. 
 things that backend services usually do, but for the sake of exploring the Go language let's pretend that we're building
 the War Operation Plan Response system featured in the movie, WarGames.
 
+## Initializing the project
+
+Create a new repository in Github and initialize it with the .gitignore template tailored for Go and add a README 
+file and set the license if you wish.  Clone the new repository to your hard drive and change directory into the
+project directory. We will use Go Modules to manage the projects dependencies.  To initialize a new project with a 
+`go.mod` file, run the following command:
+
+```
+go mod init github.com/<your git hub account>/tictactoe
+```
+
+Next edit your .gitignore file in your IDE and unhash `#vendor/` and delete the comment above it such that the last line
+of the file looks as follows:
+```
+vendor/
+```
+Uncommenting `vendor/` will make git track changes made to the vendor directory so that third party dependencies 
+will be committed to git.  This effectively caches the dependencies in your repository. This could come in handy should
+a library become unavailable for whatever reason.
+
+## Adding code
+
+Every Go program has a main file, a main package and a main function.  Thus we need to add a file
