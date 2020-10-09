@@ -112,10 +112,10 @@ import (
 func main() {
     // Paragraph #1
     err := godotenv.Load()
-	if err != nil {
-		log.Printf("not using .env file")
-	}
-	
+    if err != nil {
+        log.Printf("not using .env file")
+    }
+
     // Paragraph #2 
     router := httprouter.New()
     router.NotFound = http.FileServer(http.Dir("static"))
