@@ -66,7 +66,7 @@ go mod init github.com/<your git hub account>/tictactoe
 
 Next edit your .gitignore file in your IDE and unhash `#vendor/` and "fix" the comment above it, also add an entry 
 for `.env`.  The last lines of the file are as follows: 
-```
+```gitignore
 # Dependency directories 
 vendor/
 
@@ -96,7 +96,7 @@ Javascript.  We will add content to this directory later, for now just leave it 
 Every Go program has a main file, a main package and a main function.  Create a `main.go` file inside your project 
 directory as follows:
 
-```
+```go
 package main
 
 import (

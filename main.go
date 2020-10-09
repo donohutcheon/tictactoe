@@ -21,7 +21,7 @@ func main() {
 	router.PUT("/game-state", game.TicTacToeStateHandler)
 	router.NotFound = http.FileServer(http.Dir("static"))
 
-	port        := os.Getenv("PORT")
+	port := os.Getenv("PORT")
 	if len(port) == 0 {
 		port = "8080"
 	}
