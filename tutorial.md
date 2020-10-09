@@ -96,7 +96,7 @@ Javascript.  We will add content to this directory later, for now just leave it 
 Every Go program has a main file, a main package and a main function.  Create a `main.go` file inside your project 
 directory as follows:
 
-```go
+```{.go .numberLines}
 package main
 
 import (
