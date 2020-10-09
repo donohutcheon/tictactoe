@@ -7,45 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGame_String(t *testing.T) {
-	type fields struct {
-		Board [][]SquareState
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		expected string
-	}{
-		{
-			name:   "Golden",
-			fields: fields{
-				Board: [][]SquareState{
-					{SquareStateEmpty,SquareStateNaught,SquareStateNaught},
-					{SquareStateCross,SquareStateCross,SquareStateNaught},
-					{SquareStateNaught,SquareStateCross,SquareStateCross},
-				},
-			},
-			expected: " |0|0\n-+-+-\nX|X|0\n-+-+-\n0|X|X\n",
-		},
-		{
-			name:   "Zero",
-			fields: fields{
-				Board: nil,
-			},
-			expected: "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			g := &Game{
-				Board: tt.fields.Board,
-			}
-			str := g.String()
-			assert.Equal(t, tt.expected, str)
-		})
-	}
-}
-
 func TestGame_SetBoard(t *testing.T) {
 	type args struct {
 		x      int
@@ -61,8 +22,8 @@ func TestGame_SetBoard(t *testing.T) {
 		{
 			name:    "Opening Move",
 			initialGameState:  Game{
-				Board: MakeBoard(3),
-				Turn: 1,
+				Board: makeBoard(3),
+				Turn:  1,
 			},
 			args:    args{
 				x:      1,
@@ -128,7 +89,7 @@ func TestGame_SetBoard(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := &tt.initialGameState
-			err := g.SetBoard(tt.args.x, tt.args.y)
+			err := g.occupyPosition(tt.args.x, tt.args.y)
 			assert.Equal(t, tt.expErr, err)
 			assert.Equal(t, tt.expGameState, *g)
 		})
@@ -238,8 +199,8 @@ func TestGame_CheckGameOver(t *testing.T) {
 		{
 			name:   "Stalemate",
 			fields: fields{
-				Turn: 10,
-				Board: MakeBoard(3),
+				Turn:  10,
+				Board: makeBoard(3),
 			},
 			want:   ResultStalemate,
 		},
@@ -276,9 +237,69 @@ func TestGame_CheckGameOver(t *testing.T) {
 				Turn:  tt.fields.Turn,
 				Board: tt.fields.Board,
 			}
-			got, gotWinningRow := g.GetGameResult()
+			got, gotWinningRow := g.getGameResult()
 			assert.Equal(t, tt.want, got)
 			assert.Equal(t, tt.expWinningRow, gotWinningRow)
+		})
+	}
+}
+
+func TestComputeMove(t *testing.T) {
+	type args struct {
+		gameState Game
+		player    rune
+		result    int
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  int
+		wantX int
+		wantY int
+	}{
+		{
+			name:  "Naughts Win",
+			args:  args{
+				gameState: Game{
+					Turn:  6,
+					Board: [][]SquareState{
+						{SquareStateCross, SquareStateEmpty, SquareStateEmpty},
+						{SquareStateCross, SquareStateCross, SquareStateNaught},
+						{SquareStateEmpty, SquareStateEmpty, SquareStateNaught},
+					},
+				},
+				player:    '0',
+				result:    0,
+			},
+			want:  0,
+			wantX: 2,
+			wantY: 0,
+		},
+		{
+			name:  "Naughts Defend",
+			args:  args{
+				gameState: Game{
+					Turn:  4,
+					Board: [][]SquareState{
+						{SquareStateNaught, SquareStateEmpty, SquareStateEmpty},
+						{SquareStateCross, SquareStateCross, SquareStateEmpty},
+						{SquareStateEmpty, SquareStateEmpty, SquareStateEmpty},
+					},
+				},
+				player:    '0',
+				result:    0,
+			},
+			want:  0,
+			wantX: 2,
+			wantY: 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotX, gotY := computeMove(tt.args.gameState, true)
+			t.Log(got, gotX, gotY)
+			assert.Equal(t, tt.wantX, gotX)
+			assert.Equal(t, tt.wantY, gotY)
 		})
 	}
 }

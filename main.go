@@ -18,14 +18,13 @@ func main() {
 	}
 
 	router := httprouter.New()
-	router.PUT("/game-state", game.SetGameState)
+	router.PUT("/game-state", game.TicTacToeStateHandler)
 	router.Handler(http.MethodGet, "/debug/pprof/*item", http.DefaultServeMux)
 
 	static := httprouter.New()
 	static.ServeFiles ("/*filepath", http.Dir("static"))
 	router.NotFound =  static
 
-	//ServiceAddress address to listen on
 	port        := os.Getenv("PORT")
 	if len(port) == 0 {
 		port = "8080"
