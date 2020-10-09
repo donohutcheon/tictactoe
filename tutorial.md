@@ -116,23 +116,23 @@ func main() {
 		log.Printf("not using .env file")
 	}
 	
-    // Paragraph #2
-	router := httprouter.New()
-	router.NotFound = http.FileServer(http.Dir("static"))
+    // Paragraph #2 
+    router := httprouter.New()
+    router.NotFound = http.FileServer(http.Dir("static"))
 
     // Paragraph #3
-	port := os.Getenv("PORT")
-	if len(port) == 0 {
-		port = "8080"
-	}
+    port := os.Getenv("PORT")
+    if len(port) == 0 {
+        port = "8080"
+    }
 
     // Paragraph #4
-	serviceAddress := fmt.Sprintf(":%s", port)
-	srv := &http.Server{
-		Addr:              serviceAddress,
-		Handler:           router,
-	}
-	log.Fatal(srv.ListenAndServe())
+    serviceAddress := fmt.Sprintf(":%s", port)
+    srv := &http.Server{
+        Addr:              serviceAddress,
+        Handler:           router,
+    }
+    log.Fatal(srv.ListenAndServe())
 }
 ```
 
