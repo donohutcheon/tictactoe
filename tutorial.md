@@ -22,6 +22,9 @@ At the time I was too young to understand what was meant by "The only winning mo
 child playing against a computer I often messed-up and lost. It became clear to me as I grew that the best result you can
 hope for is a draw.
 
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=F7qOV8xonfY" target="_blank"><img src="http://img.youtube.com/vi/F7qOV8xonfY/0.jpg" 
+alt="WarGames" width="240" height="180" border="10" /></a>
+
 So then: why Tic Tac Toe? 
 In the past, when learning a new language I've often found myself going down the path of building Tic Tac Toe to explore
 the features and nuances of that language. 
@@ -61,15 +64,70 @@ project directory. We will use Go Modules to manage the projects dependencies.  
 go mod init github.com/<your git hub account>/tictactoe
 ```
 
-Next edit your .gitignore file in your IDE and unhash `#vendor/` and delete the comment above it such that the last line
-of the file looks as follows:
+Next edit your .gitignore file in your IDE and unhash `#vendor/` and "fix" the comment above it, also add an entry 
+for `.env`.  The last lines of the file are as follows: 
 ```
+# Dependency directories 
 vendor/
+
+# Development specific environment variables
+.env
+
 ```
 Uncommenting `vendor/` will make git track changes made to the vendor directory so that third party dependencies 
 will be committed to git.  This effectively caches the dependencies in your repository. This could come in handy should
 a library become unavailable for whatever reason.
 
+Add a hidden file called `.env` which we will use in conjunction with [godotenv](github.com/joho/godotenv) library to 
+specify development specific environment variables. This is a nifty mechanism to "use" environment variables in 
+development without actually using them.  Down the line, this will allow our code to be seamlessly deployed to a cloud
+service such as Heroku or Google Cloud Run.  These platforms usually require the server to listen on a predetermined
+port specified by the cloud platform.  This is usually done through use of environment variables.
+`PORT` is the only environment variable applicable to this project. Add the following content to the file:
+```
+PORT=8080
+```
+
+Lastly create a directory called `static` inside our project directory to house all our static HTML, CSS, favicon and 
+Javascript.  We will add content to this directory later, for now just leave it empty.
+
 ## Adding code
 
-Every Go program has a main file, a main package and a main function.  Thus we need to add a file
+Every Go program has a main file, a main package and a main function.  Create a `main.go` file inside your project 
+directory as follows:
+
+```
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+
+	"github.com/joho/godotenv"
+	"github.com/julienschmidt/httprouter"
+)
+
+func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Printf("failed to load env file : %s", err)
+	}
+
+	router := httprouter.New()
+	router.NotFound = http.FileServer(http.Dir("static"))
+
+	port := os.Getenv("PORT")
+	if len(port) == 0 {
+		port = "8080"
+	}
+	serviceAddress := fmt.Sprintf(":%s", port)
+	srv := &http.Server{
+		Addr:              serviceAddress,
+		Handler:           router,
+	}
+	log.Fatal(srv.ListenAndServe())
+}
+```
+
