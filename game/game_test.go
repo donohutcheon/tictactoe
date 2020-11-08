@@ -13,15 +13,15 @@ func TestGame_SetBoard(t *testing.T) {
 		y      int
 	}
 	tests := []struct {
-		name    string
-		initialGameState  Game
-		args    args
-		expErr  error
-		expGameState Game
+		name             string
+		initialGameState TicTacToeState
+		args             args
+		expErr           error
+		expGameState     TicTacToeState
 	}{
 		{
 			name:    "Opening Move",
-			initialGameState:  Game{
+			initialGameState:  TicTacToeState{
 				Board: makeBoard(3),
 				Turn:  1,
 			},
@@ -29,7 +29,7 @@ func TestGame_SetBoard(t *testing.T) {
 				x:      1,
 				y:      1,
 			},
-			expGameState: Game{
+			expGameState: TicTacToeState{
 				Turn:  2,
 				Board: [][]SquareState{
 					{SquareStateEmpty, SquareStateEmpty, SquareStateEmpty},
@@ -40,7 +40,7 @@ func TestGame_SetBoard(t *testing.T) {
 		},
 		{
 			name:    "Mid-game Move",
-			initialGameState:  Game{
+			initialGameState:  TicTacToeState{
 				Board: [][]SquareState{
 					{SquareStateEmpty, SquareStateCross, SquareStateEmpty},
 					{SquareStateNaught, SquareStateCross, SquareStateEmpty},
@@ -51,7 +51,7 @@ func TestGame_SetBoard(t *testing.T) {
 				x:      0,
 				y:      0,
 			},
-			expGameState: Game{
+			expGameState: TicTacToeState{
 				Turn: 6,
 				Board: [][]SquareState{
 					{SquareStateCross, SquareStateCross, SquareStateEmpty},
@@ -66,12 +66,12 @@ func TestGame_SetBoard(t *testing.T) {
 				x:      3,
 				y:      0,
 			},
-			expGameState: Game{},
-			expErr: errors.New("invalid coordinate"),
+			expGameState: TicTacToeState{},
+			expErr:       errors.New("invalid coordinate"),
 		},
 		{
 			name:    "Already occupied",
-			initialGameState: Game{
+			initialGameState: TicTacToeState{
 				Board: [][]SquareState{{SquareStateNaught}},
 				Turn: 2,
 			},
@@ -79,7 +79,7 @@ func TestGame_SetBoard(t *testing.T) {
 				x:      0,
 				y:      0,
 			},
-			expGameState: Game{
+			expGameState: TicTacToeState{
 				Board: [][]SquareState{{SquareStateNaught}},
 				Turn: 2,
 			},
@@ -92,31 +92,6 @@ func TestGame_SetBoard(t *testing.T) {
 			err := g.occupyPosition(tt.args.x, tt.args.y)
 			assert.Equal(t, tt.expErr, err)
 			assert.Equal(t, tt.expGameState, *g)
-		})
-	}
-}
-
-func TestSquareState_Opponent(t *testing.T) {
-	tests := []struct {
-		name        string
-		player      rune
-		expOpponent rune
-	}{
-		{
-			name:        "Cross",
-			player:      '0',
-			expOpponent: 'X',
-		},
-		{
-			name:        "Naught",
-			player:      'X',
-			expOpponent: '0',
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			opponent := opponent(tt.player)
-			assert.Equal(t, tt.expOpponent, opponent)
 		})
 	}
 }
@@ -233,7 +208,7 @@ func TestGame_CheckGameOver(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			g := &Game{
+			g := &TicTacToeState{
 				Turn:  tt.fields.Turn,
 				Board: tt.fields.Board,
 			}
@@ -246,7 +221,7 @@ func TestGame_CheckGameOver(t *testing.T) {
 
 func TestComputeMove(t *testing.T) {
 	type args struct {
-		gameState Game
+		gameState TicTacToeState
 		player    rune
 		result    int
 	}
@@ -260,7 +235,7 @@ func TestComputeMove(t *testing.T) {
 		{
 			name:  "Naughts Win",
 			args:  args{
-				gameState: Game{
+				gameState: TicTacToeState{
 					Turn:  6,
 					Board: [][]SquareState{
 						{SquareStateCross, SquareStateEmpty, SquareStateEmpty},
@@ -278,7 +253,7 @@ func TestComputeMove(t *testing.T) {
 		{
 			name:  "Naughts Defend",
 			args:  args{
-				gameState: Game{
+				gameState: TicTacToeState{
 					Turn:  4,
 					Board: [][]SquareState{
 						{SquareStateNaught, SquareStateEmpty, SquareStateEmpty},

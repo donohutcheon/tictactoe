@@ -11,7 +11,7 @@ In this tutorial you will learn how to:
 
 The following pre-requisites should be in place to successfully follow this guide.
 
-1. Go lang should be installed on your computer.
+1. Go should be installed on your computer.
 1. You should have a basic understanding of Go, HTML, CSS and JavaScript.
 
 ## Introduction
@@ -19,8 +19,8 @@ The following pre-requisites should be in place to successfully follow this guid
 Tic Tac Toe otherwise known as "Naughts and Crosses" is a really basic board game familiar to everyone the World over. 
 When I was a young kiddie, Tic Tac Toe captured my imagination in the 1983 film: [WarGames](https://youtu.be/F7qOV8xonfY).
 At the time I was too young to understand what was meant by "The only winning move is not to play" because as a clueless
-child playing against a computer I often messed-up and lost. It became clear to me as I grew that the best result you can
-hope for is a draw.
+child playing against a computer I often messed-up and lost. It became clear to me as I grew that two players, playing 
+flawlessly, the best result one can hope for is a draw.
 
 <a href="http://www.youtube.com/watch?feature=player_embedded&v=F7qOV8xonfY" target="_blank"><img src="http://img.youtube.com/vi/F7qOV8xonfY/0.jpg" 
 alt="WarGames" width="240" height="180" border="10" /></a>
@@ -136,6 +136,19 @@ func main() {
 }
 ```
 
+To update your vendor dependencies, run the following command:
+```
+go mod vendor
+```
+
+You should see some similar to:
+```
+go: finding module for package github.com/joho/godotenv
+go: finding module for package github.com/julienschmidt/httprouter
+go: found github.com/joho/godotenv in github.com/joho/godotenv v1.3.0
+go: found github.com/julienschmidt/httprouter in github.com/julienschmidt/httprouter v1.3.0
+```
+
 The breakdown is as follows:
 ### Paragraph #1 Loading development ENV values
 As mentioned above, we use github.com/joho/godotenv to load environment variables specific to your development 
@@ -162,6 +175,332 @@ specified port. `http.ListenAndServe` is a blocking call which returns upon erro
 ## Adding the game logic
 
 In this section we are going to:
-1. Create a new package called game and add a new file called game.go.
-1. Write the logic that will govern the game.
-1. Write tests to prove the logic. 
+- Create a new package called game and add a new file called game.go.
+- Write the HTTP handler to process requests sent from the browser.
+- Write the logic that will govern the game.
+- Write tests to prove the logic. 
+
+### Create the `game` package
+Create a new directory underneath your project directory called `game` and add a new file called `game.go` to that 
+directory.
+
+Add the following code to the `game.go` file.  This declares the data structures that will use in the game, to maintain 
+state and communicate with the browser over HTTP. 
+
+```go
+package game
+
+type SquareState rune
+const (
+	SquareStateEmpty  SquareState = 0
+	SquareStateCross  SquareState = 'X'
+	SquareStateNaught SquareState = '0'
+)
+
+type Result int
+const (
+	ResultNone      Result = iota
+	ResultNInARow   Result = iota
+	ResultStalemate Result = iota
+)
+
+type TicTacToeState struct {
+	Board [][]SquareState `json:"board"`
+	Turn  int             `json:"-"`
+}
+
+type TicTacToeStateResponse struct {
+	Board      [][]SquareState   `json:"board"`
+	Result     Result            `json:"result,omitempty"`
+	WinningRow [][]SquareState   `json:"winningRow,omitempty"`
+	Turn       int               `json:"turn"`
+	NextPlayer rune              `json:"nextPlayer"`
+}
+```
+
+### `SquareState`
+We declare `SquareState` as an alias to `rune` which we will use to declare three constants to denote the state of a 
+square on the game board.  Each square can either be empty or contain a `0` or an `X`. 
+
+### `Result`
+`Result` is another type alias of int.  We will use this type to denote the result of the game.  Our implementation of 
+Tic-tac-toe has three states the game can be in: 
+1. `ResultNone` There are still empty squares on the board, and the game has not concluded with any player making a row 
+of three.   
+1. `ResultNInARow` A player has managed to best its opponent by placing 3 pieces next to each other to make a
+row of three and win the game.
+1. `ResultStalemate` There are no empty squares left on the board with neither player succeeding to make a row of 
+three.
+
+In each case [`iota`](https://golang.org/ref/spec#Iota) is used to assign a successive integer value to the constant,
+making each constant unique with respect to the others declared in the same group.
+
+### `TicTacToeState`
+`TicTacToeState` models the state of the game and defines the structure of the request to be received from the 
+browser.  It contains a 2D slice of `SquareStates` to represent each square of the board; which is essentially the 
+state.  The struct also contains an integer called `turn` which indicates whose turn is next.  This field is calculated 
+by counting the non-empty squares of the board.  By caching this counter in the struct, it saves us from having to
+recalculate it each time we need it. 
+
+### `TicTacToeStateResponse`
+`TicTacToeStateResponse` specifies the structure of the response sent back to the browser after the player's move has 
+been processed by the game's logic.  The server sends the new state of the board back to the client in the `Board` field.
+The `Result` field indicates the state of the game.  `omit empty` will omit the `result` json field from the response 
+if the game has reached a conclusion; i.e. the result is `ResultNone` since in GoLang zero values are synonymous to being
+empty. `Turn` and `NextPlayer` are useful meta-data fields to augment the response with additional information about the
+state of the game.
+
+### HTTP Handler
+
+The MUX server routes all `PUT` requests made to `/game-state` through to `TicTacToeStateHandler`.  This is the only 
+request handler this game needs. `PUT` method is a good option to choose for this request since the handler is idempotent,
+meaning the same request can be repeatedly submitted to the server with no changes to state or side effects. The   
+state of our game is the board, and the server does not maintain state in session variables, databases, etc.   
+
+```go
+// TicTacToeStateHandler accepts a TicTacToeState representing the
+// current state of the game and responds with a TicTacToeStateResponse
+// describing the new state of the game.
+func TicTacToeStateHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+    // Parapgraph #1
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		writeHTTPError(w, http.StatusBadRequest, "could read request", err)
+		return
+	}
+
+    // Parapgraph #2
+	req := &TicTacToeState{
+		Board: makeBoard(3),
+	}
+	err = json.Unmarshal(b, req)
+	if err != nil {
+		writeHTTPError(w, http.StatusBadRequest, "could not interpret request", err)
+		return
+	}
+
+	req.calculateStateFromRequest()
+   
+    // Parapgraph #3
+	result, _ := req.getGameResult()
+	if result == ResultNone {
+		_, x, y := computeMove(*req, true)
+		err = req.occupyPosition(x, y)
+		if err != nil {
+			writeHTTPError(w, http.StatusInternalServerError, "failed to set board", err)
+			return
+		}
+	}
+
+    // Parapgraph #4
+	result, winningRow := req.getGameResult()
+	resp := TicTacToeStateResponse{
+		Board:      req.Board,
+		Result:     result,
+		Turn:       req.Turn,
+		WinningRow: winningRow,
+		NextPlayer: req.playersTurn(),
+	}
+
+    // Parapgraph #5
+	b, err = json.Marshal(resp)
+	if err != nil {
+		writeHTTPError(w, http.StatusInternalServerError, "failed to marshal response", err)
+		return
+	}
+
+    // Parapgraph #6
+	_, err = w.Write(b)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+}
+
+func writeHTTPError(w http.ResponseWriter, statusCode int, description string, err error) {
+	message := fmt.Sprintf("%s : %v", description, err)
+	_, wErr := w.Write([]byte(message))
+	if wErr != nil {
+		log.Fatal(wErr)
+	}
+	log.Fatal(description, err)
+	w.WriteHeader(statusCode)
+}
+```
+
+`Paragraphs #1 and #2` concern unmarshalling the request from JSON to `TicTacToeState` which represents the state of the
+board.
+
+`Parapgraph #3` calls into the heart of the game's logic. If the game is still in play, we compute the most effective 
+move in response to the current state of the game.
+
+`Parapgraph #4` collates the response in preparation to be sent back to the browser.
+
+`Parapgraph #5 and #6` encodes the response into JSON which is written to the response writer and sent back to the 
+browser.
+
+In the event that an error occurs, `writeHTTPError` is called to write the status code and error description 
+to the response writer. Note that `http.StatusBadRequest` is used in cases where the error centered around the request,
+whereas `http.StatusInternalServerError` is returned where the internal logic of the system encountered a failure. 
+
+### Game Logic
+
+Before turning our focus directly onto the logic that makes the game tick, we have two helper/utility functions 
+`makeBoard` and `copyBoard` which provide the functionality needed to initialize empty boards and copy existing boards 
+respectively. These are needed since in this design, we have used a 2D slice to represent the state of the board. 
+Alternatively we could've used a single `n x n` slice and used modular and division arithmetic to calculate board 
+positions. For instance the middle right `(2,1)` square of the board would be `board[5]`; `5` could be mapped to co-ordinates as
+follows (keep in mind that slices and arrays are zero-based):
+```go
+col := 5 % 3 // == 2
+row := 5 / 3 // == 1
+```  
+Each approach trades-off complexity in different areas.
+ 
+```go
+func makeBoard(n int) [][]SquareState {
+	board := make([][]SquareState, n)
+	for i := 0; i < n; i++ {
+		board[i] = make([]SquareState, n)
+	}
+
+	return board
+}
+
+func copyBoard(src [][]SquareState) [][]SquareState {
+	n := len(src)
+	board := make([][]SquareState, n)
+	for j := 0; j < n; j++ {
+		board[j] = make([]SquareState, n)
+		copy(board[j], src[j])
+	}
+
+	return board
+}
+```
+
+`TicTacToeState` structure has several pointer receiver functions to initialize, get and set the state of the game.
+ 
+- `initialize` calculates and caches the `Turn` property of the game's state so that it doesn't need to be calculated it
+time its required.
+```go
+func (t *TicTacToeState) initialize() {
+	turn := 1
+	for _, y := range t.Board {
+		for _, x := range y {
+			if x != SquareStateEmpty {
+				turn++
+			}
+		}
+	}
+
+	t.Turn = turn
+}
+```
+
+- `playersTurn` returns the symbol of the current player expected to make the next move.
+```go
+func (t *TicTacToeState) playersTurn() rune {
+	if t.Turn % 2 == 1 {
+		return 'X'
+	}
+
+	return '0'
+}
+```
+
+- `isOccupied` returns `true`/`false` whether the specified co-ordinates are occupied. 
+```go
+func (t *TicTacToeState) isOccupied(x, y int) bool {
+	return t.Board[y][x] != SquareStateEmpty
+}
+```
+
+- `occupyPosition` marks the specified co-ordinates occupied according to whose turn it is.
+```go
+func (t *TicTacToeState) occupyPosition(x, y int) error {
+	if x < 0 || x > len(t.Board) || y < 0 || y > len(t.Board) {
+		return errors.New("invalid coordinate")
+	}
+	if t.Board[y][x] != SquareStateEmpty {
+		return errors.New("already occupied")
+	}
+
+	player := t.playersTurn()
+	t.Turn++
+	if player == 'X' {
+		t.Board[y][x] = SquareStateCross
+		return nil
+	}
+	t.Board[y][x] = SquareStateNaught
+
+	return nil
+}
+```
+
+- `getGameResult`. Ideally functions should have one purpose or do one thing.  This function kind of breaks this rule,
+in that it calculates the result of the game and returns the row that concluded the game (if there is one). In this case
+the two concepts are related enough to combine them. Under the hood this function probes each line (diagonal, row and 
+column) to find a row of n adjacent pieces. It does this by iterating over each square of that line and compares 
+whether the adjacent pieces are equal. The comparison loop ends if two positions differ as there is no point checking 
+any further. If the loop managed to increment `i` enough times to equate to `n - 1` then a concluding line has been
+found, and the player that made that line has won the game.
+```go
+// getGameResult calculates the current state of the game returning the result
+//  and the row that concluded the game if there is a complete row, nil otherwise.
+func (t *TicTacToeState) getGameResult() (Result, [][]SquareState) {
+	n := len(t.Board)
+	var rowOfN [][]SquareState
+
+	// Check diagonal
+	rowOfN = makeBoard(n)
+	var i int
+	for i = 0; i < n - 1 && t.Board[i][i] == t.Board[i+1][i+1] && t.Board[i][i] != SquareStateEmpty; i++ {
+		rowOfN[i][i] = t.Board[i][i]
+		rowOfN[i+1][i+1] = t.Board[i+1][i+1]
+	}
+	if i == n - 1 {
+		return ResultNInARow, rowOfN
+	}
+
+	// Check anti-diagonal
+	rowOfN = makeBoard(n)
+	for i = 0; i < n - 1 && t.Board[n-1-i][i] == t.Board[n-i-2][i+1] && t.Board[n-i-2][i+1] != SquareStateEmpty; i++ {
+		rowOfN[n-1-i][i] = t.Board[n-1-i][i]
+		rowOfN[n-i-2][i+1] = t.Board[n-i-2][i+1]
+	}
+	if i == n - 1 {
+		return ResultNInARow, rowOfN
+	}
+
+	var j int
+	for j = 0; j < n; j++ {
+		// Check columns
+		rowOfN = makeBoard(n)
+		for i = 0; i < n-1 && t.Board[i][j] == t.Board[i+1][j] && t.Board[i][j] != SquareStateEmpty; i++ {
+			rowOfN[i][j] = t.Board[i][j]
+			rowOfN[i+1][j] = t.Board[i+1][j]
+		}
+		if i == n - 1 {
+			return ResultNInARow, rowOfN
+		}
+
+		// Check rows
+		rowOfN = makeBoard(n)
+		for i = 0; i < n-1 && t.Board[j][i] == t.Board[j][i+1] && t.Board[j][i] != SquareStateEmpty; i++ {
+			rowOfN[j][i] = t.Board[j][i]
+			rowOfN[j][i+1] = t.Board[j][i+1]
+		}
+		if i == n - 1 {
+			return ResultNInARow, rowOfN
+		}
+	}
+
+	// Check for stalemate
+	if t.Turn > n * n {
+		return ResultStalemate, nil
+	}
+
+	return ResultNone, nil
+}
+```

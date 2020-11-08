@@ -12,7 +12,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-type SquareState int
+type SquareState rune
 const (
 	SquareStateEmpty  SquareState = 0
 	SquareStateCross  SquareState = 'X'
@@ -21,18 +21,14 @@ const (
 
 type Result int
 const (
-	ResultNone      Result = 0
-	ResultNInARow   Result = 1
-	ResultStalemate Result = 2
+	ResultNone      Result = iota
+	ResultNInARow   Result = iota
+	ResultStalemate Result = iota
 )
 
-type Game struct {
-	Board [][]SquareState
-	Turn int
-}
-
-type TicTacToeStateRequest struct {
+type TicTacToeState struct {
 	Board [][]SquareState `json:"board"`
+	Turn  int             `json:"-"`
 }
 
 type TicTacToeStateResponse struct {
@@ -41,6 +37,75 @@ type TicTacToeStateResponse struct {
 	WinningRow [][]SquareState   `json:"winningRow,omitempty"`
 	Turn       int               `json:"turn"`
 	NextPlayer rune              `json:"nextPlayer"`
+}
+
+// TicTacToeStateHandler accepts a TicTacToeState representing the
+// current state of the game and responds with a TicTacToeStateResponse
+// describing the new state of the game.
+func TicTacToeStateHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	// Parapgraph #1
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		writeHTTPError(w, http.StatusBadRequest, "could read request", err)
+		return
+	}
+
+	// Parapgraph #2
+	req := &TicTacToeState{
+		Board: makeBoard(3),
+	}
+	err = json.Unmarshal(b, req)
+	if err != nil {
+		writeHTTPError(w, http.StatusBadRequest, "could not interpret request", err)
+		return
+	}
+
+	req.initialize()
+
+	// Parapgraph #3
+	result, _ := req.getGameResult()
+	if result == ResultNone {
+		_, x, y := computeMove(*req, true)
+		err = req.occupyPosition(x, y)
+		if err != nil {
+			writeHTTPError(w, http.StatusInternalServerError, "failed to set board", err)
+			return
+		}
+	}
+
+	// Parapgraph #4
+	result, winningRow := req.getGameResult()
+	resp := TicTacToeStateResponse{
+		Board:      req.Board,
+		Result:     result,
+		Turn:       req.Turn,
+		WinningRow: winningRow,
+		NextPlayer: req.playersTurn(),
+	}
+
+	// Parapgraph #5
+	b, err = json.Marshal(resp)
+	if err != nil {
+		writeHTTPError(w, http.StatusInternalServerError, "failed to marshal response", err)
+		return
+	}
+
+	// Parapgraph #6
+	_, err = w.Write(b)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+}
+
+func writeHTTPError(w http.ResponseWriter, statusCode int, description string, err error) {
+	message := fmt.Sprintf("%s : %v", description, err)
+	_, wErr := w.Write([]byte(message))
+	if wErr != nil {
+		log.Fatal(wErr)
+	}
+	log.Fatal(description, err)
+	w.WriteHeader(statusCode)
 }
 
 func makeBoard(n int) [][]SquareState {
@@ -63,9 +128,9 @@ func copyBoard(src [][]SquareState) [][]SquareState {
 	return board
 }
 
-func newGameFromRequest(req *TicTacToeStateRequest) *Game {
+func (t *TicTacToeState) initialize() {
 	turn := 1
-	for _, y := range req.Board {
+	for _, y := range t.Board {
 		for _, x := range y {
 			if x != SquareStateEmpty {
 				turn++
@@ -73,59 +138,52 @@ func newGameFromRequest(req *TicTacToeStateRequest) *Game {
 		}
 	}
 
-	return &Game{
-		Board: req.Board,
-		Turn: turn,
-	}
+	t.Turn = turn
 }
 
-func opponent(player rune) rune {
-	return player ^ 'h'
-}
-
-func (g *Game) playersTurn() rune {
-	if g.Turn % 2 == 1 {
+func (t *TicTacToeState) playersTurn() rune {
+	if t.Turn % 2 == 1 {
 		return 'X'
 	}
 
 	return '0'
 }
 
-func (g *Game) isOccupied(x, y int) bool {
-	return g.Board[y][x] != SquareStateEmpty
+func (t *TicTacToeState) isOccupied(x, y int) bool {
+	return t.Board[y][x] != SquareStateEmpty
 }
 
-func (g *Game) occupyPosition(x, y int) error {
-	if x < 0 || x > 2 || y < 0 || y > 2 {
+func (t *TicTacToeState) occupyPosition(x, y int) error {
+	if x < 0 || x > len(t.Board) || y < 0 || y > len(t.Board) {
 		return errors.New("invalid coordinate")
 	}
-	if g.Board[y][x] != SquareStateEmpty {
+	if t.Board[y][x] != SquareStateEmpty {
 		return errors.New("already occupied")
 	}
 
-	player := g.playersTurn()
-	g.Turn++
+	player := t.playersTurn()
+	t.Turn++
 	if player == 'X' {
-		g.Board[y][x] = SquareStateCross
+		t.Board[y][x] = SquareStateCross
 		return nil
 	}
-	g.Board[y][x] = SquareStateNaught
+	t.Board[y][x] = SquareStateNaught
 
 	return nil
 }
 
 // getGameResult calculates the current state of the game returning the result
 //  and the row that concluded the game if there is a complete row, nil otherwise.
-func (g *Game) getGameResult() (Result, [][]SquareState) {
-	n := len(g.Board)
+func (t *TicTacToeState) getGameResult() (Result, [][]SquareState) {
+	n := len(t.Board)
 	var rowOfN [][]SquareState
 
 	// Check diagonal
 	rowOfN = makeBoard(n)
 	var i int
-	for i = 0; i < n - 1 && g.Board[i][i] == g.Board[i+1][i+1] && g.Board[i][i] != SquareStateEmpty; i++ {
-		rowOfN[i][i] = g.Board[i][i]
-		rowOfN[i+1][i+1] = g.Board[i+1][i+1]
+	for i = 0; i < n - 1 && t.Board[i][i] == t.Board[i+1][i+1] && t.Board[i][i] != SquareStateEmpty; i++ {
+		rowOfN[i][i] = t.Board[i][i]
+		rowOfN[i+1][i+1] = t.Board[i+1][i+1]
 	}
 	if i == n - 1 {
 		return ResultNInARow, rowOfN
@@ -133,11 +191,11 @@ func (g *Game) getGameResult() (Result, [][]SquareState) {
 
 	// Check anti-diagonal
 	rowOfN = makeBoard(n)
-	for i = 0; i < n - 1 && g.Board[n-1-i][i] == g.Board[n-i-2][i+1] && g.Board[n-i-2][i+1] != SquareStateEmpty; i++ {
-		rowOfN[n-1-i][i] = g.Board[n-1-i][i]
-		rowOfN[n-i-2][i+1] = g.Board[n-i-2][i+1]
+	for i = 0; i < n - 1 && t.Board[n-1-i][i] == t.Board[n-i-2][i+1] && t.Board[n-i-2][i+1] != SquareStateEmpty; i++ {
+		rowOfN[n-1-i][i] = t.Board[n-1-i][i]
+		rowOfN[n-i-2][i+1] = t.Board[n-i-2][i+1]
 	}
-	if i == 2 {
+	if i == n - 1 {
 		return ResultNInARow, rowOfN
 	}
 
@@ -145,9 +203,9 @@ func (g *Game) getGameResult() (Result, [][]SquareState) {
 	for j = 0; j < n; j++ {
 		// Check columns
 		rowOfN = makeBoard(n)
-		for i = 0; i < n-1 && g.Board[i][j] == g.Board[i+1][j] && g.Board[i][j] != SquareStateEmpty; i++ {
-			rowOfN[i][j] = g.Board[i][j]
-			rowOfN[i+1][j] = g.Board[i+1][j]
+		for i = 0; i < n-1 && t.Board[i][j] == t.Board[i+1][j] && t.Board[i][j] != SquareStateEmpty; i++ {
+			rowOfN[i][j] = t.Board[i][j]
+			rowOfN[i+1][j] = t.Board[i+1][j]
 		}
 		if i == n-1 {
 			return ResultNInARow, rowOfN
@@ -155,9 +213,9 @@ func (g *Game) getGameResult() (Result, [][]SquareState) {
 
 		// Check rows
 		rowOfN = makeBoard(n)
-		for i = 0; i < n-1 && g.Board[j][i] == g.Board[j][i+1] && g.Board[j][i] != SquareStateEmpty; i++ {
-			rowOfN[j][i] = g.Board[j][i]
-			rowOfN[j][i+1] = g.Board[j][i+1]
+		for i = 0; i < n-1 && t.Board[j][i] == t.Board[j][i+1] && t.Board[j][i] != SquareStateEmpty; i++ {
+			rowOfN[j][i] = t.Board[j][i]
+			rowOfN[j][i+1] = t.Board[j][i+1]
 		}
 		if i == n-1 {
 			return ResultNInARow, rowOfN
@@ -165,24 +223,14 @@ func (g *Game) getGameResult() (Result, [][]SquareState) {
 	}
 
 	// Check for stalemate
-	if g.Turn > n * n {
+	if t.Turn > n * n {
 		return ResultStalemate, nil
 	}
 
 	return ResultNone, nil
 }
 
-func writeHTTPError(w http.ResponseWriter, statusCode int, description string, err error) {
-	message := fmt.Sprintf("%s : %v", description, err)
-	_, wErr := w.Write([]byte(message))
-	if wErr != nil {
-		log.Fatal(wErr)
-	}
-	log.Fatal(description, err)
-	w.WriteHeader(statusCode)
-}
-
-func computeMove(gameState Game, isMax bool) (int, int, int) {
+func computeMove(gameState TicTacToeState, isMax bool) (int, int, int) {
 	optimalX := 0
 	optimalY := 0
 	multiplier := 1
@@ -197,7 +245,7 @@ func computeMove(gameState Game, isMax bool) (int, int, int) {
 				continue
 			}
 
-			gs := Game{
+			gs := TicTacToeState{
 				Board: copyBoard(gameState.Board),
 				Turn:  gameState.Turn,
 			}
@@ -225,56 +273,4 @@ func computeMove(gameState Game, isMax bool) (int, int, int) {
 	}
 
 	return threshold, optimalX, optimalY
-}
-
-// TicTacToeStateHandler accepts a TicTacToeStateRequest representing the
-// current state of the game and responds with a TicTacToeStateResponse
-// describing the new state of the game.
-func TicTacToeStateHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	b, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		writeHTTPError(w, http.StatusBadRequest, "could read request", err)
-		return
-	}
-
-	req := &TicTacToeStateRequest{
-		Board: makeBoard(3),
-	}
-	err = json.Unmarshal(b, req)
-	if err != nil {
-		writeHTTPError(w, http.StatusBadRequest, "could not interpret request", err)
-		return
-	}
-
-	g := newGameFromRequest(req)
-	result, _ := g.getGameResult()
-	if result == ResultNone {
-		_, x, y := computeMove(*g, true)
-		err = g.occupyPosition(x, y)
-		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, "failed to set board", err)
-			return
-		}
-	}
-
-	result, winningRow := g.getGameResult()
-	resp := TicTacToeStateResponse{
-		Board:      g.Board,
-		Result:     result,
-		Turn:       g.Turn,
-		WinningRow: winningRow,
-		NextPlayer: g.playersTurn(),
-	}
-
-	b, err = json.Marshal(resp)
-	if err != nil {
-		writeHTTPError(w, http.StatusInternalServerError, "failed to marshal response", err)
-		return
-	}
-
-	_, err = w.Write(b)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
 }
