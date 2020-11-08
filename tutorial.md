@@ -1,4 +1,4 @@
-Tic Tac Toe
+#Tic Tac Toe
 
 In this tutorial you will learn how to:
 
@@ -55,7 +55,7 @@ the War Operation Plan Response system featured in the movie, WarGames.
 
 ## Initializing the project
 
-Create a new repository in Github and initialize it with the .gitignore template tailored for Go and add a README 
+Create a new repository in Github and initialize it with the `.gitignore` template tailored for Go and add a README 
 file and set the license if you wish.  Clone the new repository to your hard drive and change directory into the
 project directory. We will use Go Modules to manage the projects dependencies.  To initialize a new project with a 
 `go.mod` file, run the following command:
@@ -64,7 +64,7 @@ project directory. We will use Go Modules to manage the projects dependencies.  
 go mod init github.com/<your git hub account>/tictactoe
 ```
 
-Next edit your .gitignore file in your IDE and unhash `#vendor/` and "fix" the comment above it, also add an entry 
+Next edit your `.gitignore` file in your IDE and unhash `#vendor/` and "fix" the comment above it, also add an entry 
 for `.env`.  The last lines of the file are as follows: 
 ```gitignore
 # Dependency directories 
@@ -93,7 +93,7 @@ Javascript.  We will add content to this directory later, for now just leave it 
 
 ## Adding the main function
 
-Every Go program has a main file, a main package and a main function.  Create a `main.go` file inside your project 
+Every Go program has a main package and a main function.  Create a `main.go` file inside your project 
 directory as follows:
 
 ```go
@@ -442,7 +442,7 @@ func (t *TicTacToeState) occupyPosition(x, y int) error {
 in that it calculates the result of the game and returns the row that concluded the game (if there is one). In this case
 the two concepts are related enough to combine them. Under the hood this function probes each line (diagonal, row and 
 column) to find a row of n adjacent pieces. It does this by iterating over each square of that line and compares 
-whether the adjacent pieces are equal. The comparison loop ends if two positions differ as there is no point checking 
+whether the adjacent piece is equal. The comparison loop ends if two positions differ as there is no point checking 
 any further. If the loop managed to increment `i` enough times to equate to `n - 1` then a concluding line has been
 found, and the player that made that line has won the game.
 ```go
