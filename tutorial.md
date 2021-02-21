@@ -3,8 +3,8 @@
 In this tutorial you will learn how to:
 
 1. Build a web based Tic Tac Toe game in Go.
-1. Write a web based client in vanilla JavaScript.
 1. Implement the minimax algorithm to recursively calculate the most optimal next move for the computer.
+1. Write a web based client in vanilla JavaScript.
 1. Write unit and integration tests to exercise and prove correctness of the logic.
 
 ## Pre-requisites
@@ -347,10 +347,11 @@ whereas `http.StatusInternalServerError` is returned where the internal logic of
 
 Before turning our focus directly onto the logic that makes the game tick, we have two helper/utility functions 
 `makeBoard` and `copyBoard` which provide the functionality needed to initialize empty boards and copy existing boards 
-respectively. These are needed since in this design, we have used a 2D slice to represent the state of the board. 
-Alternatively we could've used a single `n x n` slice and used modular and division arithmetic to calculate board 
-positions. For instance the middle right `(2,1)` square of the board would be `board[5]`; `5` could be mapped to co-ordinates as
-follows (keep in mind that slices and arrays are zero-based):
+respectively. These are needed since in this design, we have used a 2D slice to represent the state of the board.  Each
+individual nested slice needs to be initialized and allocated memory. Alternatively we could've used a single `n x n` 
+slice and used modular and division arithmetic to calculate board positions. For instance the middle right `(2,1)` 
+square of the board would be `board[5]`; `5` could be mapped to co-ordinates as follows (keep in mind that slices and
+arrays are zero-based):
 ```go
 col := 5 % 3 // == 2
 row := 5 / 3 // == 1
@@ -379,10 +380,10 @@ func copyBoard(src [][]SquareState) [][]SquareState {
 }
 ```
 
-`TicTacToeState` structure has several pointer receiver functions to initialize, get and set the state of the game.
+The`TicTacToeState` struct has several pointer receiver functions: to initialize, get and set the game state.
  
-- `initialize` calculates and caches the `Turn` property of the game's state so that it doesn't need to be calculated it
-time its required.
+- `initialize` calculates and caches the `Turn` property of the game's state so that it does not need to be calculated 
+each time its required.
 ```go
 func (t *TicTacToeState) initialize() {
 	turn := 1
@@ -502,5 +503,60 @@ func (t *TicTacToeState) getGameResult() (Result, [][]SquareState) {
 	}
 
 	return ResultNone, nil
+}
+```
+
+## Computing the next move
+
+The `computeMove` function employs a Minimax algorithm to calculate the most effective next move.  It does this through 
+"bruteforce" exploring every possible eventuality of the game and picking the best move. Imagine that the progression of 
+the game is a tree with each alternating level the algorithm seeking to find:
+- the best move for you, that puts your opponent at the biggest disadvantage
+- the best move for your opponent to make that sets you up with the biggest advantage.  
+
+```go
+func computeMove(gameState TicTacToeState, isMax bool) (int, int, int) {
+	optimalX := 0
+	optimalY := 0
+	multiplier := 1
+	if !isMax {
+		multiplier = -1
+	}
+	threshold := math.MaxInt32 * -1 * multiplier
+
+	for y := 0; y < 3; y++ {
+		for x := 0; x < 3; x++ {
+			if gameState.isOccupied(x, y) {
+				continue
+			}
+
+			gs := TicTacToeState{
+				Board: copyBoard(gameState.Board),
+				Turn:  gameState.Turn,
+			}
+
+			err := gs.occupyPosition(x, y)
+			if err != nil {
+				log.Fatal(err)
+				continue
+			}
+			result, _ := gs.getGameResult()
+			if result == ResultNInARow {
+				return 1 * multiplier, x, y
+			} else if result == ResultStalemate {
+				return 0, x, y
+			}
+
+			r, _, _ := computeMove(gs, !isMax)
+
+			if (isMax && r > threshold) || (!isMax && r < threshold) {
+				threshold = r
+				optimalX = x
+				optimalY = y
+			}
+		}
+	}
+
+	return threshold, optimalX, optimalY
 }
 ```

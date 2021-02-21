@@ -123,6 +123,22 @@ function renderInstructions (response) {
   }
 }
 
+function player(gameState) {
+  let count = 0
+  for (let j = 0; j < gameState.length; j++) {
+    for (let i = 0; i < gameState[j].length; i++) {
+      if (gameState[j][i] !== 0){
+        count++
+      }
+    }
+  }
+  if (count % 2 === 0) {
+    return 'X'
+  } else {
+    return '0'
+  }
+}
+
 function onMouseDown (e) {
   const [x, y] = getMouseClickCoords(canvas, e)
   const [isValid, tx, ty] = getTranslatedCoords(canvas, x, y)
@@ -131,14 +147,12 @@ function onMouseDown (e) {
   }
   if (typeof gameState !== 'undefined' && gameState != null && gameState.length != null &&
         gameState[ty][tx] === 0) {
-    gameState[ty][tx] = 'X'.charCodeAt(0)
-    axios({
-      method: 'put',
-      url: '/game-state',
-      data: {
-        board: gameState
-      }
-    }).then(response => gameStateResponse(response))
+    gameState[ty][tx] = player(gameState).charCodeAt(0)
+    drawState(canvas, gameState, winningRow)
+    canvas.toBlob(function(blob)
+    {
+      saveAs(blob, "x.png")
+    })
   }
 }
 
